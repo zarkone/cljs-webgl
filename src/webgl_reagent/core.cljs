@@ -43,7 +43,11 @@
       (.attachShader shader-program vertex-shader)
       (.attachShader shader-program fragment-shader)
       (.linkProgram shader-program))
-    shader-program))
+
+    (if-not (.getProgramParameter gl shader-program (.-LINK_STATUS gl))
+      (.error js/console (str "ERR: " (.getProgramInfoLog gl shader-program)))
+      shader-program)
+    ))
 
 (defn init-buffers [gl]
   (let [position-buffer (.createBuffer gl)
@@ -137,8 +141,8 @@
                  (js/Float32Array. texture-coordinates)
                  (.-STATIC_DRAW gl))
 
-    (.bindBuffer gl (.-ARRAY_BUFFER gl) index-buffer)
-    (.bufferData gl (.-ARRAY_BUFFER gl)
+    (.bindBuffer gl (.-ELEMENT_ARRAY_BUFFER gl) index-buffer)
+    (.bufferData gl (.-ELEMENT_ARRAY_BUFFER gl)
                  (js/Uint16Array. indices)
                  (.-STATIC_DRAW gl))
 
@@ -186,18 +190,18 @@
     (.rotate js/mat4
              model-view-matrix
              model-view-matrix
-             0
+             0.5
              #js [0 0 1])
     (.rotate js/mat4
              model-view-matrix
              model-view-matrix
-             0
+             0.15
              #js [0 1 0])
 
     (doto gl
       (.bindBuffer (.-ARRAY_BUFFER gl) (:position buffers))
       (.vertexAttribPointer (-> program-info :attribLocations :vertexPosition)
-                            num-components
+                            3
                             type
                             normalize
                             stride
@@ -207,7 +211,7 @@
     (doto gl
       (.bindBuffer (.-ARRAY_BUFFER gl) (:texture-coord buffers))
       (.vertexAttribPointer (-> program-info :attribLocations :textureCoord)
-                            num-components
+                            2
                             type
                             normalize
                             stride
@@ -253,7 +257,7 @@
         border 0
         src-format  (.-RGBA gl)
         src-type (.-UNSIGNED_BYTE gl)
-        pixel (js/Uint8Array. #js [0 0 255 255])
+        pixel (js/Uint8Array. #js [255 0 255 255])
 
         image (js/Image.)]
 
@@ -270,8 +274,7 @@
        (.bindTexture gl (.-TEXTURE_2D gl) texture)
        (.texImage2D gl (.-TEXTURE_2D gl)
                     level internal-format
-                    width height border
-                    src-format src-type pixel)
+                    src-format src-type image)
 
 
        (if (and (is-power-of-two? (.-width image))
@@ -303,7 +306,9 @@
   (let [gl (-> (.querySelector js/document "#glCanvas")
                (.getContext "webgl"))
         shader-program (init-shader-program gl vertex-shader-src fragment-shader-src)
-        texture (load-texture gl "https://raw.githubusercontent.com/mdn/webgl-examples/gh-pages/tutorial/sample6/cubetexture.png")
+        image-url "/img/cubetexture.png"
+        ;; image-url "https://upload.wikimedia.org/wikipedia/commons/5/5c/Red-square.gif"
+        texture (load-texture gl image-url)
         program-info {:program shader-program
                       :attribLocations {:vertexPosition (.getAttribLocation gl shader-program "aVertexPosition")
                                         :textureCoord (.getAttribLocation gl shader-program "aTextureCoord")}
