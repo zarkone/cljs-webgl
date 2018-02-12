@@ -19,7 +19,7 @@
       vTextureCoord = aTextureCoord;
     }")
 
-(def fragment-shader-src
+#_(def fragment-shader-src
   "varying highp vec2 vTextureCoord;
 
    uniform sampler2D uSampler;
@@ -27,6 +27,19 @@
    void main(void) {
       gl_FragColor = texture2D(uSampler, vTextureCoord);
     }")
+
+(def fragment-shader-src
+  "precision mediump float;
+  uniform sampler2D uSampler;
+  uniform vec4 u_color;
+  uniform float u_buffer;
+  uniform float u_gamma;
+  varying vec2 vTextureCoord;
+  void main() {
+  float dist = texture2D(uSampler, vTextureCoord).r;
+  float alpha = smoothstep(u_buffer - u_gamma, u_buffer + u_gamma, dist);
+  gl_FragColor = vec4(u_color.rgb, alpha * u_color.a);
+}")
 
 (defn load-shader [gl type source]
   (let [shader (.createShader gl type)]
@@ -248,7 +261,7 @@
 (defn is-power-of-two? [value]
   (= 0 (bit-and value (dec value))))
 
-(defn load-texture [gl url]
+(defn load-texture [gl tiny-sdf]
   (let [texture (.createTexture gl)
         level 0
         internal-format (.-RGBA gl)
@@ -259,7 +272,10 @@
         src-type (.-UNSIGNED_BYTE gl)
         pixel (js/Uint8Array. #js [255 0 255 255])
 
-        image (js/Image.)]
+        image (js/Image.)
+        text-canvas (.-canvas tiny-sdf)
+
+        ]
 
     (.bindTexture gl (.-TEXTURE_2D gl) texture)
     (.texImage2D gl (.-TEXTURE_2D gl)
@@ -268,14 +284,13 @@
                  src-format src-type pixel)
 
     (.addEventListener
-     image "load"
+       image "load"
      (fn [e]
        (.log js/console "IMAGE LOAD")
        (.bindTexture gl (.-TEXTURE_2D gl) texture)
        (.texImage2D gl (.-TEXTURE_2D gl)
                     level internal-format
                     src-format src-type image)
-
 
        (if (and (is-power-of-two? (.-width image))
                 (is-power-of-two? (.-height image)))
@@ -296,19 +311,25 @@
 
        ))
 
-    (set! (.-src image) url)
+    (set! (.-src image) (.toDataURL text-canvas))
+
     texture
 
     ))
 
 
 (defn webgl-run! []
-  (let [gl (-> (.querySelector js/document "#glCanvas")
+  (let [context-2d (-> (.querySelector js/document "#textCanvas")
+                       (.getContext "2d"))
+        gl (-> (.querySelector js/document "#glCanvas")
                (.getContext "webgl"))
         shader-program (init-shader-program gl vertex-shader-src fragment-shader-src)
         image-url "/img/cubetexture.png"
         ;; image-url "https://upload.wikimedia.org/wikipedia/commons/5/5c/Red-square.gif"
-        texture (load-texture gl image-url)
+        tiny-sdf (js/TinySDF.)
+        _ (.draw tiny-sdf "foobar")
+        texture (load-texture gl tiny-sdf)
+
         program-info {:program shader-program
                       :attribLocations {:vertexPosition (.getAttribLocation gl shader-program "aVertexPosition")
                                         :textureCoord (.getAttribLocation gl shader-program "aTextureCoord")}
@@ -316,6 +337,9 @@
                                          :modelViewMatrix (.getUniformLocation gl shader-program "uModelViewMatrix")
                                          :uSampler (.getUniformLocation gl shader-program "uSampler")
                                          }}]
+
+    ;; (set! (.-font context-2d) "30px")
+    ;; (.fillText context-2d "HEllo!" 10 50)
 
     (.clearColor gl 0.0 0.0 0.0 1.0)
     (.clear gl (.-COLOR_BUFFER_BIT gl))
