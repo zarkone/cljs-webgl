@@ -297,10 +297,10 @@
        ))
 
     (set! (.-src image) url)
-
     texture
 
     ))
+
 
 (defn webgl-run! []
   (let [gl (-> (.querySelector js/document "#glCanvas")
@@ -320,7 +320,10 @@
     (.clearColor gl 0.0 0.0 0.0 1.0)
     (.clear gl (.-COLOR_BUFFER_BIT gl))
 
-    (draw-scene gl program-info (init-buffers gl) texture)))
+    (.setTimeout js/window
+                  (fn [_]
+                    (draw-scene gl program-info (init-buffers gl) texture))
+                  500)))
 
 (webgl-run!)
 ;; define your app data so that it doesn't get over-written on reload
